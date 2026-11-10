@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>K리그 주식시장</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@700&display=swap" rel="stylesheet">
+<style>
+/* 컨셉: 경기장 전광판 같은 어두운 시세표. 바탕은 밤 경기장의 잔디색, 포인트는 전북 초록 하나.
+   글자 크기 5단계(12/14/16/20/32), 간격은 4의 배수만, 모서리 4px 하나, 굵기 400/500/700만 사용.
+   그라데이션, 빛 번짐, 이모지, 자간 넓힌 대문자 라벨은 쓰지 않음. */
+:root{
+  --bg:#0B0F0D; --panel:#121A16; --line:#232C27; --chip:#1A2420;
+  --text:#E8ECE8; --muted:#8A948C;
+  --accent:#3FB968;
+  --up:#E5675F; --down:#5B8DEF;
+  --t1:12px; --t2:14px; --t3:16px; --t4:20px; --t5:32px;
+  --r:4px;
+  --sans:'Noto Sans KR',system-ui,sans-serif; --serif:'Noto Serif KR',serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:var(--t2);line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+.wrap{max-width:720px;margin:0 auto;padding-block:32px 48px}
+button,input{font-family:inherit;font-size:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+
+header{padding-bottom:24px}
+h1{font-family:var(--serif);font-weight:700;font-size:var(--t5);line-height:1.25;margin:0}
+.lede{margin:8px 0 0;color:var(--muted);font-size:var(--t2);max-width:32em}
+
+.panel{background:var(--panel);border-radius:var(--r);padding:24px}
+.me{margin-bottom:12px}
+.me small{display:block;font-size:var(--t1);color:var(--muted)}
+.m-big{font-family:var(--serif);font-size:var(--t5);font-weight:700;line-height:1.25;margin-top:4px;font-variant-numeric:tabular-nums}
+.m-big span{font-family:var(--sans);font-size:var(--t2);font-weight:400;margin-left:8px;color:var(--muted)}
+.m-pl{margin-top:4px;font-size:var(--t2);font-weight:500;font-variant-numeric:tabular-nums}
+.pos{color:var(--up)}.neg{color:var(--down)}.zero{color:var(--muted)}
+.m-sub{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.m-sub b{display:block;font-size:var(--t3);font-weight:500;margin-top:4px;font-variant-numeric:tabular-nums}
+.status{min-height:24px;margin:8px 0;font-size:var(--t2);color:var(--accent)}
+.status.err{color:var(--up)}
+
+.evrow{display:flex;gap:8px 16px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px}
+.evnote{margin:0;font-size:var(--t2);color:var(--muted)}
+.evnote b{color:var(--text);font-weight:500}
+
+.pickbar{display:flex;gap:12px 16px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px}
+.pickbar b{font-size:var(--t3);font-weight:500;display:block}
+.pickbar span{font-size:var(--t2);color:var(--muted)}
+.pbtns{display:flex;gap:8px;flex-wrap:wrap}
+
+/* 종목 목록: 가는 선으로 나눈 표 */
+.list{border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:24px minmax(0,1fr) 64px auto;grid-template-areas:"rank name spark quote" "trade trade trade trade";gap:12px;align-items:center;padding:16px 0;border-bottom:1px solid var(--line)}
+.c-rank{grid-area:rank;font-size:var(--t2);color:var(--muted);font-variant-numeric:tabular-nums}
+.c-name{grid-area:name;min-width:0}
+.c-name h3{margin:0;font-size:var(--t3);font-weight:700}
+.rec{font-size:var(--t1);color:var(--muted);margin-top:4px}
+.c-spark{grid-area:spark;cursor:pointer}
+.spark{display:block;width:100%;height:32px}
+.c-quote{grid-area:quote;text-align:right;min-width:88px}
+.c-price{font-size:var(--t4);font-weight:500;font-variant-numeric:tabular-nums}
+.c-chg{margin-top:4px;font-size:var(--t1);font-variant-numeric:tabular-nums}
+.c-chg.up{color:var(--up)}.c-chg.down{color:var(--down)}.c-chg.flat{color:var(--muted)}
+.c-trade{grid-area:trade;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-left:36px}
+.hold{flex:1;min-width:120px;font-size:var(--t1);color:var(--muted);text-align:right}
+
+.act{border:1px solid;border-radius:var(--r);height:36px;padding:0 16px;font-size:var(--t2);font-weight:500;background:transparent}
+.act.buy{color:var(--up);border-color:var(--up)}
+.act.buy:hover:not(:disabled){background:var(--up);color:var(--bg)}
+.act.sell{color:var(--down);border-color:var(--down)}
+.act.sell:hover:not(:disabled){background:var(--down);color:var(--bg)}
+.act.plain{color:var(--text);border-color:var(--line)}
+.act.plain:hover{border-color:var(--muted)}
+.act.green{color:var(--accent);border-color:var(--accent)}
+.act.green:hover{background:var(--accent);color:var(--bg)}
+.act:disabled{opacity:.4;cursor:not-allowed}
+.act.big{flex:1;height:48px;font-size:var(--t3)}
+.ghost{background:transparent;color:var(--text);border:1px solid var(--line);border-radius:var(--r);padding:8px 12px;font-size:var(--t2)}
+.ghost:hover{border-color:var(--muted)}
+
+.qty{display:flex;align-items:center;border:1px solid var(--line);border-radius:var(--r)}
+.qty button{background:transparent;color:var(--text);border:0;width:36px;height:36px;font-size:var(--t3)}
+.qty input{width:56px;height:36px;text-align:center;background:transparent;color:var(--text);border:0;border-inline:1px solid var(--line);font-size:var(--t3);font-variant-numeric:tabular-nums}
+
+/* 팝업 */
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:var(--r);padding:24px;width:min(400px,calc(100vw - 32px));margin:auto;max-height:90vh;overflow:auto}
+dialog::backdrop{background:rgba(0,0,0,.7)}
+dialog h2{font-family:var(--serif);font-size:var(--t4);font-weight:700;margin:0 0 16px}
+.pk-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:12px}
+.pk-top h2{margin:0}
+.pk-count{font-size:var(--t2);color:var(--accent);margin-bottom:12px}
+.o-line{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);color:var(--muted)}
+.o-line em{font-style:normal;font-size:var(--t1);margin-left:8px}
+.o-line .num{color:var(--text);font-size:var(--t3);font-weight:500}
+.o-quick{display:flex;gap:8px;margin:16px 0}
+.o-quick .ghost{flex:1;padding:8px 0}
+.o-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px}
+.o-total small{font-size:var(--t2);color:var(--muted)}
+.o-total .num{font-family:var(--serif);font-size:var(--t5);font-weight:700}
+.o-after{font-size:var(--t1);color:var(--muted);text-align:right;margin-top:4px}
+.o-warn{min-height:24px;font-size:var(--t2);color:var(--up);margin-top:8px}
+.o-btns{display:flex;gap:12px;margin-top:8px}
+.o-btns .ghost{padding:0 24px;height:48px;font-size:var(--t3)}
+
+#pick{width:min(520px,calc(100vw - 32px))}
+.pk-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:4px;overflow-x:auto}
+.pk-tabs button{background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 12px;font-size:var(--t2);white-space:nowrap;margin-bottom:-1px}
+.pk-tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
+.pk-date{font-size:var(--t1);color:var(--muted);margin:24px 0 4px;font-weight:500}
+.pk-match{padding:12px 0;border-bottom:1px solid var(--line)}
+.pk-meta{font-size:var(--t2);color:var(--muted);margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pk-meta .num{color:var(--text)}
+.pk-badge{margin-left:auto;font-size:var(--t1);color:var(--muted)}
+.pk-badge.win{color:var(--up)}
+.pk-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.pk-btns button{background:transparent;color:var(--text);border:1px solid var(--line);border-radius:var(--r);height:40px;font-size:var(--t2)}
+.pk-btns button:hover:not(:disabled){border-color:var(--muted)}
+.pk-btns button.on{border-color:var(--accent);color:var(--accent);background:var(--chip)}
+.pk-btns button:disabled{opacity:.4;cursor:not-allowed}
+
+#rank{width:min(440px,calc(100vw - 32px))}
+.rk-nick{display:flex;gap:8px;margin-bottom:12px}
+.rk-nick input{flex:1;min-width:0;height:40px;background:transparent;color:var(--text);border:1px solid var(--line);border-radius:var(--r);padding:0 12px}
+.rk-list{list-style:none;margin:0;padding:0}
+.rk-list li{display:grid;grid-template-columns:32px 1fr auto;gap:8px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--line)}
+.rk-list li.me{color:var(--accent)}
+.rk-list .n{color:var(--muted)}
+.rk-list .v{font-variant-numeric:tabular-nums}
+
+#share{width:min(400px,calc(100vw - 32px))}
+#chart{width:min(480px,calc(100vw - 32px))}
+#chSvg svg{width:100%;height:auto;display:block;margin:8px 0 4px}
+#chSvg .gl{stroke:var(--line)} #chSvg .tx{fill:var(--muted)} #chSvg .bl{stroke:var(--muted)}
+.ch-list{list-style:none;margin:0;padding:0}
+.ch-list li{display:grid;grid-template-columns:1fr auto auto;gap:4px 12px;padding:12px 0;border-bottom:1px solid var(--line);color:var(--muted);align-items:baseline}
+.ch-list .v{color:var(--text);font-variant-numeric:tabular-nums}
+.ch-list .d{font-size:var(--t1);min-width:64px;text-align:right}
+
+.rules{margin-top:32px;padding-top:24px;border-top:1px solid var(--line)}
+.rules h2{font-family:var(--serif);font-size:var(--t4);font-weight:700;margin:0 0 16px}
+.rules ul{margin:0;padding:0;list-style:none;display:grid;gap:12px;color:var(--muted)}
+.rules li b{display:block;color:var(--text);font-weight:500}
+.reset{margin-top:24px}
+footer{margin-top:32px;font-size:var(--t1);color:var(--muted)}
+
+@media (max-width:480px){
+  .panel{padding:16px}
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>K리그 주식시장</h1>
+    <p class="lede">팀 성적이 곧 가격이에요. 가상 머니 1,000,000으로 시작해서 팀을 사고팔아 보세요. 진짜 돈은 오가지 않아요.</p>
+  </header>
+
+  <div class="panel me" id="me" aria-label="내 자산"></div>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+  <div class="evrow"><p class="evnote" id="evnote"></p><button class="ghost" id="openShare">내 성적 카드</button></div>
+
+  <div class="panel pickbar">
+    <div><b>스코어 맞추기</b><span>파이널 라운드 경기 결과를 맞히면 경기당 300,000 머니를 줘요.</span></div>
+    <div class="pbtns"><button class="act green" id="openPick">예측하기</button></div>
+  </div>
+
+  <div class="panel pickbar" id="rankbar">
+    <div><b>자산 랭킹</b><span>자산 랭킹을 확인해 보세요.</span></div>
+    <div class="pbtns"><button class="act plain" id="openRank">랭킹 보기</button></div>
+  </div>
+
+  <div class="list" id="list"></div>
+
+  <section class="rules">
+    <h2>이렇게 움직여요</h2>
+    <ul>
+      <li><b>처음 가격</b>35경기가 끝난 시점의 승점 × 200이에요. 500원 단위로 맞춰요.</li>
+      <li><b>경기 결과</b>이기면 +5%, 비기면 그대로, 지면 -5%예요. 한 경기가 끝나면 두 팀 가격이 같이 바뀌어요. 실제 결과는 운영자가 넣어요.</li>
+      <li><b>이벤트</b>화·수·목·토요일엔 가격이 무작위로 흔들려요. 팀마다 ±5% 안이고, 같은 날엔 모두에게 똑같이 적용돼요.</li>
+      <li><b>스코어 맞추기</b>파이널 라운드 모든 경기의 승·무·패를 킥오프 전까지 고를 수 있어요. 맞히면 경기당 300,000 머니를 받아요.</li>
+      <li><b>거래</b>지금 가격으로 언제든 사고팔 수 있고 수수료는 없어요.</li>
+      <li><b>저장</b>내 자산은 이 기기에만 저장돼요. 다른 기기에서는 안 보여요.</li>
+      <li><b>랭킹</b>닉네임을 정하면 총 자산이 순위에 올라가요. 로그인 없는 가벼운 순위라 재미로만 봐 주세요.</li>
+      <li><b>알아두세요</b>가상 머니 게임이에요. 실제 돈, 상품, 경품과는 관계없어요.</li>
+    </ul>
+  </section>
+  <div class="reset"><button class="ghost" id="resetBtn">처음부터 다시 시작</button></div>
+  <footer>전모알 · 전북현대의 모든 것을 알려준다</footer>
+</div>
+
+<dialog id="order" aria-labelledby="oTitle">
+  <h2 id="oTitle"></h2>
+  <div class="o-line"><span>현재가</span><span class="num" id="oPrice"></span></div>
+  <div class="o-line"><span>수량 <em id="oMax"></em></span>
+    <div class="qty"><button data-q="dec" aria-label="수량 줄이기">−</button><input id="oQ" type="number" min="1" max="99999" inputmode="numeric" aria-label="수량"><button data-q="inc" aria-label="수량 늘리기">+</button></div>
+  </div>
+  <div class="o-quick"><button class="ghost" data-q="5">+5</button><button class="ghost" data-q="10">+10</button><button class="ghost" data-q="50">+50</button><button class="ghost" data-q="max">최대</button></div>
+  <div class="o-total"><small id="oTotalLabel"></small><span class="num" id="oTotal"></span></div>
+  <div class="o-after num" id="oAfter"></div>
+  <div class="o-warn" id="oWarn" role="alert"></div>
+  <div class="o-btns"><button class="ghost" id="oCancel">취소</button><button class="act big" id="oConfirm"></button></div>
+</dialog>
+
+<dialog id="chart" aria-labelledby="chTitle">
+  <div class="pk-top"><h2 id="chTitle"></h2><button class="ghost" id="chClose">닫기</button></div>
+  <div class="pk-count" id="chSub"></div>
+  <div id="chSvg"></div>
+  <ol class="ch-list" id="chList"></ol>
+</dialog>
+
+<dialog id="share" aria-labelledby="shareTitle">
+  <div class="pk-top"><h2 id="shareTitle">내 성적 카드</h2><button class="ghost" id="shareClose">닫기</button></div>
+  <img id="shareImg" alt="내 성적 카드 미리보기" style="width:100%;height:auto;display:block;border-radius:12px">
+  <div class="pk-count" id="shareHint" style="margin-top:10px"></div>
+  <div class="o-btns"><button class="act big green" id="shareSave" hidden>이미지 저장</button></div>
+</dialog>
+
+<dialog id="rank" aria-labelledby="rankTitle">
+  <div class="pk-top"><h2 id="rankTitle">총 자산 랭킹</h2><button class="ghost" id="rankClose">닫기</button></div>
+  <div class="rk-nick" id="rkNickBox"><input id="rkNick" maxlength="12" placeholder="닉네임 (최대 12자)" aria-label="닉네임"><button class="ghost" id="rkSave">참가</button><button class="ghost" id="rkLeave" hidden>참가 취소</button></div>
+  <div class="pk-count" id="rkMsg"></div>
+  <ol class="rk-list" id="rkList"></ol>
+</dialog>
+
+<dialog id="pick" aria-labelledby="pickTitle">
+  <div class="pk-top"><h2 id="pickTitle">스코어 맞추기</h2><button class="ghost" id="pickClose">닫기</button></div>
+  <div class="pk-count" id="pickCount"></div>
+  <div class="pk-tabs" id="pickTabs"><button data-round="36">36R · 11/21~22</button><button data-round="37">37R · 11/28~29</button><button data-round="38">38R · 12/5~6</button></div>
+  <div id="pickList"></div>
+</dialog>
+
+<script>
+/* ===== 데이터: 운영자가 경기 결과를 알려주면 RESULTS에 추가합니다 ===== */
+const START_CASH = 1000000;
+const PER_POINT = 200;
+const STEP = 0.05;
+const COLOR = {seoul:'#C8102E',ulsan:'#1D5FB4',daejeon:'#7B1F3A',gangwon:'#E8681A',jeonbuk:'#1B8A5A',incheon:'#2B3A8C',jeju:'#F28C1B',anyang:'#6A3593',pohang:'#B3202A',gimcheon:'#4A5568',bucheon:'#B8203C',gwangju:'#D4A017'};
+const TEAMS = [
+  {id:'seoul',   name:'FC 서울', rank:1, w:20, d:7,  l:8,  pts:67},
+  {id:'ulsan',   name:'울산',    rank:2, w:17, d:6,  l:12, pts:57},
+  {id:'daejeon', name:'대전',    rank:3, w:14, d:11, l:10, pts:53},
+  {id:'gangwon', name:'강원',    rank:4, w:12, d:15, l:8,  pts:51},
+  {id:'jeonbuk', name:'전북',    rank:5, w:12, d:13, l:10, pts:49, mine:true},
+  {id:'incheon', name:'인천',    rank:6, w:13, d:10, l:12, pts:49},
+  {id:'jeju',    name:'제주',    rank:7, w:12, d:12, l:11, pts:48},
+  {id:'anyang',  name:'안양',    rank:8, w:11, d:13, l:11, pts:46},
+  {id:'pohang',  name:'포항',    rank:9, w:11, d:11, l:13, pts:44},
+  {id:'gimcheon',name:'김천',    rank:10,w:6,  d:20, l:9,  pts:38},
+  {id:'bucheon', name:'부천',    rank:11,w:7,  d:12, l:16, pts:33},
+  {id:'gwangju', name:'광주',    rank:12,w:3,  d:14, l:18, pts:23}
+];
+/* 형식: {round:36, home:'jeonbuk', away:'seoul', hs:1, as:0} */
+const RESULTS = [];
+
+const KEY = 'kleague-stock-v1';
+const PICK_REWARD = 300000; /* 경기 결과를 맞혔을 때 받는 가상 머니 */
+const NAME = {seoul:'서울',ulsan:'울산',daejeon:'대전',gangwon:'강원',jeonbuk:'전북',incheon:'인천',gwangju:'광주',gimcheon:'김천',pohang:'포항',jeju:'제주',anyang:'안양',bucheon:'부천'};
+/* 파이널 라운드 전체 일정 (36~38R). 34·35R은 이미 끝났으므로 제외. 시간은 한국시간 */
+const MATCHES = [
+  [36,'2026-11-21','14:00','jeonbuk','seoul','전주월드컵'],[36,'2026-11-21','14:00','pohang','anyang','포항스틸야드'],
+  [36,'2026-11-21','16:30','gangwon','daejeon','강릉하이원'],[36,'2026-11-21','16:30','incheon','ulsan','인천전용'],
+  [36,'2026-11-22','14:00','gimcheon','jeju','김천종합'],[36,'2026-11-22','14:00','gwangju','bucheon','광주월드컵'],
+  [37,'2026-11-28','14:00','seoul','daejeon','서울월드컵'],[37,'2026-11-28','14:00','anyang','jeju','안양종합'],
+  [37,'2026-11-28','16:30','pohang','gwangju','포항스틸야드'],[37,'2026-11-28','16:30','bucheon','gimcheon','부천종합'],
+  [37,'2026-11-29','14:00','ulsan','jeonbuk','울산문수'],[37,'2026-11-29','16:30','incheon','gangwon','인천전용'],
+  [38,'2026-12-05','14:00','jeju','bucheon','제주월드컵'],[38,'2026-12-05','14:00','anyang','gwangju','안양종합'],
+  [38,'2026-12-05','14:00','gimcheon','pohang','김천종합'],[38,'2026-12-06','14:00','daejeon','ulsan','대전월드컵'],
+  [38,'2026-12-06','14:00','gangwon','seoul','강릉하이원'],[38,'2026-12-06','14:00','jeonbuk','incheon','전주월드컵']
+].map(([round,date,time,home,away,venue]) => ({id:`${round}-${home}-${away}`, round, date, time, home, away, venue, kick:new Date(`${date}T${time}:00+09:00`).getTime()}));
+let state = { cash: START_CASH, hold: {}, demo: [], picks: {}, paid: {} };
+try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && typeof s.cash === 'number') state = Object.assign(state, s); } catch(e){}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
+
+const won = n => Math.round(n).toLocaleString('ko-KR');
+const r10 = n => Math.max(500, Math.round(n/500)*500); /* 가격 단위: 500원 (0 또는 500으로 끝남) */
+
+function allResults(){
+  const demo = state.demo.map(o => ({home:'jeonbuk', away:'seoul', demo:true, o}));
+  return RESULTS.map(r=>Object.assign({},r)).concat(demo);
+}
+function outcome(r){ if (r.demo) return r.o; return r.hs>r.as ? 'H' : (r.hs<r.as ? 'A' : 'D'); }
+function histories(){
+  const h = {}, lab = {}; TEAMS.forEach(t => { h[t.id] = [t.pts*PER_POINT]; lab[t.id] = ['기준가 (35경기 종료)']; });
+  /* 경기 결과와 이벤트를 날짜순으로 섞어서 적용 */
+  const steps = [];
+  allResults().forEach(r => {
+    const m = MATCHES.find(x => x.round===r.round && x.home===r.home && x.away===r.away);
+    steps.push({ts: m ? m.kick : Infinity, r});
+  });
+  eventDates(kstToday()).forEach(day => steps.push({ts: new Date(day + 'T12:00:00+09:00').getTime(), day}));
+  steps.sort((x, y) => x.ts - y.ts);
+  steps.forEach(st => {
+    if (st.r){
+      const r = st.r, o = outcome(r);
+      [['home','H','A'],['away','A','H']].forEach(([side,win,lose]) => {
+        const id = r[side]; if (!h[id]) return;
+        const last = h[id][h[id].length-1];
+        h[id].push(last*(o===win ? 1+STEP : (o===lose ? 1-STEP : 1)));
+        lab[id].push(r.demo ? '시험 결과' : `${r.round}R ${NAME[r.home]} ${r.hs}:${r.as} ${NAME[r.away]}`);
+      });
+    } else {
+      TEAMS.forEach(t => {
+        const last = h[t.id][h[t.id].length-1];
+        h[t.id].push(last * (1 + (seeded(st.day + t.id)*2 - 1) * EVENT_AMP));
+        lab[t.id].push(`${+st.day.slice(5,7)}월 ${+st.day.slice(8)}일 이벤트`);
+      });
+    }
+  });
+  h._lab = lab;
+  return h;
+}
+/* 이벤트 요일(화·수·목·토) 무작위 변동: 날짜와 팀 이름으로 정해져서 누구에게나 같은 값이 나옵니다 */
+const EVENT_START = '2026-11-10', EVENT_DAYS = [2,3,4,6], EVENT_AMP = 0.05;
+const kstToday = () => new Date(Date.now() + 9*3600e3).toISOString().slice(0,10);
+function seeded(str){ let h = 1779033703 ^ str.length; for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = h<<13 | h>>>19; } h = Math.imul(h ^ h>>>16, 2246822507); h = Math.imul(h ^ h>>>13, 3266489909); return ((h ^ h>>>16)>>>0) / 4294967296; }
+function eventDates(until){
+  const out = [], d = new Date(EVENT_START + 'T00:00:00Z');
+  for (let i=0;i<120;i++){ const s = d.toISOString().slice(0,10); if (s > until) break; if (EVENT_DAYS.includes(d.getUTCDay())) out.push(s); d.setUTCDate(d.getUTCDate()+1); }
+  return out;
+}
+function nextEvent(){
+  const d = new Date(kstToday() + 'T00:00:00Z');
+  for (let i=1;i<=7;i++){ d.setUTCDate(d.getUTCDate()+1); if (EVENT_DAYS.includes(d.getUTCDay())) return `${d.getUTCMonth()+1}월 ${d.getUTCDate()}일(${'일월화수목금토'[d.getUTCDay()]})`; }
+  return '';
+}
+function prices(){
+  const h = histories(), p = {};
+  TEAMS.forEach(t => p[t.id] = r10(h[t.id][h[t.id].length-1]));
+  return {h, p};
+}
+
+const $ = s => document.querySelector(s);
+const qtyState = {}; TEAMS.forEach(t => qtyState[t.id] = 1);
+function say(msg, err){ const el=$('#status'); el.textContent=msg; el.className='status'+(err?' err':''); }
+
+function spark(vals){
+  const w=64, hgt=30, pad=3;
+  if (vals.length < 2) return `<svg class="spark" viewBox="0 0 ${w} ${hgt}" aria-hidden="true" style="color:var(--muted)"><line x1="${pad}" y1="${hgt/2}" x2="${w-pad}" y2="${hgt/2}" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 4" opacity=".5"/><circle cx="${w-pad}" cy="${hgt/2}" r="2.5" fill="currentColor"/></svg>`;
+  const mn=Math.min(...vals), mx=Math.max(...vals), span=(mx-mn)||1;
+  const pts = vals.map((v,i)=>[pad+i*(w-2*pad)/(vals.length-1), hgt-pad-(v-mn)/span*(hgt-2*pad)]);
+  const col = vals[vals.length-1] >= vals[0] ? 'var(--up)' : 'var(--down)';
+  const last = pts[pts.length-1], line = pts.map(p=>p.map(n=>n.toFixed(1)).join(',')).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${w} ${hgt}" aria-hidden="true" style="color:${col}"><polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="${line}"/><circle cx="${last[0]}" cy="${last[1]}" r="3" fill="currentColor"/></svg>`;
+}
+function chgOf(hist){
+  if (hist.length<2) return {cls:'flat', txt:'변동 없음'};
+  const d=(hist[hist.length-1]/hist[hist.length-2]-1)*100;
+  if (d>0.0001) return {cls:'up', txt:`▲ ${d.toFixed(1)}%`};
+  if (d<-0.0001) return {cls:'down', txt:`▼ ${Math.abs(d).toFixed(1)}%`};
+  return {cls:'flat', txt:'0.0%'};
+}
+
+function render(){
+  settle();
+  const {h, p} = prices();
+  let eq = 0;
+  TEAMS.forEach(t => { const x = state.hold[t.id]; if (x) eq += x.qty * p[t.id]; });
+  const total = state.cash + eq, pl = total - START_CASH, plPct = pl/START_CASH*100; lastTotal = total; schedulePublish();
+  $('#evnote').innerHTML = EVENT_DAYS.includes(new Date(kstToday()+'T00:00:00Z').getUTCDay()) && kstToday() >= EVENT_START
+    ? '<b>오늘은 이벤트 날이에요.</b> 가격이 무작위로 움직였어요.' : `다음 이벤트는 ${nextEvent()}`;
+  const plc = pl>0 ? 'pos' : pl<0 ? 'neg' : 'zero';
+  $('#me').innerHTML =
+    `<small>내 총 자산</small><div class="m-big">${won(total)}<span>머니</span></div>`+
+    `<div class="m-pl ${plc}">${pl>0?'+':''}${won(pl)} (${pl>0?'+':''}${plPct.toFixed(2)}%)</div>`+
+    `<div class="m-sub"><div><small>보유 현금</small><b>${won(state.cash)}</b></div><div><small>주식 평가액</small><b>${won(eq)}</b></div></div>`;
+
+  $('#list').innerHTML = TEAMS.map(t => {
+    const hist = h[t.id], now = p[t.id], c = chgOf(hist), x = state.hold[t.id];
+    const pnl = x ? now*x.qty - x.cost : 0;
+    const holdTxt = x ? `${x.qty}주 보유 · 평균 ${won(x.cost/x.qty)} · ${pnl>=0?'+':''}${won(pnl)}` : '';
+    return `<article class="row" data-id="${t.id}">
+      <div class="c-rank">${t.rank}</div>
+      <div class="c-name"><h3>${t.name}</h3><div class="rec">승점 ${t.pts} · ${t.w}승 ${t.d}무 ${t.l}패</div></div>
+      <div class="c-spark" title="가격 추이 보기">${spark(hist.map(v=>r10(v)))}</div>
+      <div class="c-quote"><div class="c-price">${won(now)}</div><div class="c-chg ${c.cls}">${c.txt}</div></div>
+      <div class="c-trade">
+        <button class="act buy" data-act="buy">사기</button><button class="act sell" data-act="sell"${x?'':' disabled'}>팔기</button>
+        <div class="hold num">${holdTxt}</div>
+      </div></article>`;
+  }).join('');
+}
+
+function trade(id, kind, q){
+  const {p} = prices(), price = p[id], t = TEAMS.find(x=>x.id===id);
+  q = Math.max(1, Math.floor(q) || 1);
+  if (kind==='buy'){
+    const cost = q*price;
+    if (cost > state.cash){ say(`머니가 모자라요. ${t.name} ${q}주는 ${won(cost)} 머니가 필요해요.`, true); return; }
+    const x = state.hold[id] || {qty:0, cost:0};
+    x.qty += q; x.cost += cost; state.hold[id] = x; state.cash -= cost;
+    say(`${t.name} ${q}주를 ${won(cost)} 머니에 샀어요.`);
+  } else {
+    const x = state.hold[id];
+    if (!x || x.qty < q){ say(`${t.name}은(는) ${q}주를 갖고 있지 않아요.`, true); return; }
+    const avg = x.cost / x.qty, gain = q*price;
+    x.qty -= q; x.cost -= avg*q; state.cash += gain;
+    if (x.qty === 0) delete state.hold[id];
+    say(`${t.name} ${q}주를 ${won(gain)} 머니에 팔았어요.`);
+  }
+  save(); render();
+}
+
+/* 수량 선택 창: 매수/매도를 누르면 열리고, 수량에 따라 총액이 바로 바뀝니다 */
+let ord = null;
+function maxQty(){
+  const {p} = prices(), price = p[ord.id];
+  return ord.kind==='buy' ? Math.floor(state.cash/price) : (state.hold[ord.id]?.qty || 0);
+}
+function drawOrder(){
+  const {p} = prices(), price = p[ord.id], t = TEAMS.find(x=>x.id===ord.id), mx = maxQty();
+  ord.q = Math.max(ord.min, Math.min(ord.q, Math.max(mx, ord.min)));
+  const total = ord.q*price, buy = ord.kind==='buy';
+  $('#oTitle').textContent = `${t.name} ${buy?'사기':'팔기'}`;
+  $('#oPrice').textContent = won(price);
+  $('#oQ').value = ord.q;
+  $('#oTotal').textContent = won(total);
+  $('#oTotalLabel').textContent = buy ? '살 금액' : '받을 금액';
+  const after = buy ? state.cash-total : state.cash+total;
+  $('#oAfter').textContent = `거래 후 현금 ${won(after)}`;
+  $('#oMax').textContent = `최대 ${mx}주`;
+  const bad = mx < 1 || (buy && total > state.cash);
+  $('#oConfirm').disabled = bad;
+  $('#oConfirm').textContent = buy ? '사기' : '팔기';
+  $('#oConfirm').className = 'act big ' + (buy?'buy':'sell');
+  $('#oWarn').textContent = mx < 1 ? (buy ? '머니가 모자라서 살 수 없어요.' : '가진 주식이 없어요.') : '';
+}
+function openOrder(id, kind){ ord = {id, kind, q:1, min:1}; drawOrder(); $('#order').showModal(); $('#oQ').select(); }
+function openChart(id){
+  const h = histories(), t = TEAMS.find(x => x.id===id), vals = h[id].map(r10), labs = h._lab[id];
+  $('#chTitle').textContent = `${t.name} 가격 추이`;
+  const first = vals[0], now = vals[vals.length-1], d = (now/first-1)*100;
+  $('#chSub').textContent = `기준가 ${won(first)} → 현재 ${won(now)} (${d>0?'+':''}${d.toFixed(1)}%)`;
+  const W=360, H=190, L=48, R=14, T=14, B=24;
+  const mn = Math.min(...vals), mx = Math.max(...vals), pd = Math.max((mx-mn)*0.2, 250), lo = Math.max(0, mn-pd), hi = mx+pd;
+  const X = i => vals.length===1 ? (L+W-R)/2 : L + i*(W-L-R)/(vals.length-1), Y = v => T + (hi-v)/(hi-lo)*(H-T-B);
+  const col = now >= first ? 'var(--up)' : 'var(--down)';
+  let g = '';
+  for (let k=0;k<=3;k++){ const v = lo + (hi-lo)*k/3, y = Y(v); g += `<line class="gl" x1="${L}" y1="${y}" x2="${W-R}" y2="${y}"/><text class="tx" x="${L-6}" y="${y+4}" text-anchor="end" font-size="12">${won(Math.round(v/100)*100)}</text>`; }
+  g += `<line x1="${L}" y1="${Y(first)}" x2="${W-R}" y2="${Y(first)}" class="bl" stroke-dasharray="4 4" opacity=".7"/>`;
+  const pts = vals.map((v,i) => [X(i), Y(v)]);
+  if (vals.length > 1) g += `<polygon points="${L},${H-B} ${pts.map(p=>p.join(',')).join(' ')} ${W-R},${H-B}" fill="currentColor" opacity=".12"/><polyline fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" points="${pts.map(p=>p.join(',')).join(' ')}"/>`;
+  g += pts.map((p,i) => `<circle cx="${p[0]}" cy="${p[1]}" r="${i===pts.length-1?5:3.5}" fill="currentColor"/>`).join('');
+  g += `<text class="tx" x="${L}" y="${H-6}" font-size="12">기준</text><text class="tx" x="${W-R}" y="${H-6}" text-anchor="end" font-size="12">현재</text>`;
+  $('#chSvg').innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="color:${col}" role="img" aria-label="${t.name} 가격 추이 그래프">${g}</svg>`;
+  const ol = $('#chList'); ol.textContent = '';
+  vals.map((v,i) => ({v, i})).reverse().forEach(({v,i}) => {
+    const li = document.createElement('li'), a = document.createElement('span'), b = document.createElement('span'), c = document.createElement('span');
+    a.textContent = labs[i]; b.className = 'v'; b.textContent = won(v);
+    c.className = 'd'; const ch = i ? (v/vals[i-1]-1)*100 : 0;
+    c.textContent = i ? `${ch>0?'▲':ch<0?'▼':'–'} ${Math.abs(ch).toFixed(1)}%` : '시작'; c.style.color = ch>0 ? 'var(--up)' : ch<0 ? 'var(--down)' : 'var(--muted)';
+    li.append(a, b, c); ol.append(li);
+  });
+  $('#chart').showModal();
+}
+$('#chClose').addEventListener('click', () => $('#chart').close());
+$('#chart').addEventListener('click', e => { if (e.target.id==='chart') $('#chart').close(); });
+$('#list').addEventListener('click', e => {
+  const sp = e.target.closest('.c-spark'); if (sp){ openChart(sp.closest('.row').dataset.id); return; }
+  const b = e.target.closest('button[data-act]'); if (!b || b.disabled) return;
+  openOrder(b.closest('.row').dataset.id, b.dataset.act);
+});
+$('#oQ').addEventListener('input', e => { ord.q = parseInt(e.target.value,10) || 1; drawOrder(); });
+$('#order').addEventListener('click', e => {
+  if (e.target.id==='order'){ $('#order').close(); return; }
+  const b = e.target.closest('[data-q]'); if (!b) return;
+  const v = b.dataset.q;
+  if (v==='inc') ord.q += 1; else if (v==='dec') ord.q -= 1;
+  else if (v==='max') ord.q = Math.max(1, maxQty());
+  else ord.q += parseInt(v,10);
+  drawOrder();
+});
+$('#oCancel').addEventListener('click', () => $('#order').close());
+$('#oConfirm').addEventListener('click', () => { if (ord){ trade(ord.id, ord.kind, ord.q); } $('#order').close(); });
+
+/* ===== 스코어 맞추기 ===== */
+function resultOf(m){ const r = RESULTS.find(x => x.round===m.round && x.home===m.home && x.away===m.away); return r ? {o: outcome(r), hs:r.hs, as:r.as} : null; }
+function settle(){
+  let win = 0, lose = 0;
+  MATCHES.forEach(m => {
+    const res = resultOf(m), pick = state.picks[m.id];
+    if (!res || !pick || state.paid[m.id]) return;
+    if (pick === res.o){ state.cash += PICK_REWARD; state.paid[m.id] = 'win'; win++; } else { state.paid[m.id] = 'lose'; lose++; }
+  });
+  if (win || lose){ save(); say(`경기 결과가 반영됐어요. ${win}경기 적중, ${won(win*PICK_REWARD)} 머니를 받았어요${lose?` (${lose}경기는 아쉽게 빗나갔어요)`:''}.`); }
+}
+let pickRound = 36;
+const fmtDate = d => { const dt = new Date(d+'T00:00:00+09:00'); return `${dt.getMonth()+1}월 ${dt.getDate()}일(${'일월화수목금토'[dt.getDay()]})`; };
+function drawPicks(){
+  const list = MATCHES.filter(m => m.round===pickRound);
+  const done = MATCHES.filter(m => state.picks[m.id]).length;
+  document.querySelectorAll('#pickTabs button').forEach(b => b.classList.toggle('on', +b.dataset.round===pickRound));
+  $('#pickCount').textContent = `${done} / ${MATCHES.length}경기 예측함 · 맞히면 경기당 ${won(PICK_REWARD)} 머니`;
+  let lastDate = '';
+  $('#pickList').innerHTML = list.map(m => {
+    const res = resultOf(m), locked = !!res || Date.now() >= m.kick, pick = state.picks[m.id];
+    const head = m.date !== lastDate ? `<h3 class="pk-date">${fmtDate(m.date)}</h3>` : ''; lastDate = m.date;
+    let badge = '';
+    if (res) badge = `<span class="pk-badge ${pick===res.o?'win':''}">${res.hs}:${res.as} · ${pick ? (pick===res.o ? '적중 +'+won(PICK_REWARD) : '빗나감') : '미참여'}</span>`;
+    else if (locked) badge = `<span class="pk-badge">예측 마감</span>`;
+    const btn = (v, label) => `<button data-m="${m.id}" data-v="${v}" class="${pick===v?'on':''}" ${locked?'disabled':''} aria-pressed="${pick===v}">${label}</button>`;
+    return `${head}<div class="pk-match"><div class="pk-meta"><span class="num">${m.time}</span> ${NAME[m.home]} vs ${NAME[m.away]} · ${m.venue}${badge}</div>
+      <div class="pk-btns">${btn('H', NAME[m.home]+' 승')}${btn('D','무승부')}${btn('A', NAME[m.away]+' 승')}</div></div>`;
+  }).join('');
+}
+$('#openPick').addEventListener('click', () => { drawPicks(); $('#pick').showModal(); });
+$('#pickClose').addEventListener('click', () => $('#pick').close());
+$('#pick').addEventListener('click', e => {
+  if (e.target.id==='pick'){ $('#pick').close(); return; }
+  const t = e.target.closest('#pickTabs button'); if (t){ pickRound = +t.dataset.round; drawPicks(); return; }
+  const b = e.target.closest('button[data-m]'); if (!b || b.disabled) return;
+  if (state.picks[b.dataset.m] === b.dataset.v) delete state.picks[b.dataset.m]; else state.picks[b.dataset.m] = b.dataset.v;
+  save(); drawPicks();
+});
+
+/* ===== 랭킹: Supabase 점수판 (로그인 없이 닉네임으로 참가) =====
+   아래 키는 웹페이지에 넣도록 만들어진 공개용 키입니다. 비밀 키는 이 파일에 넣지 않습니다. */
+const SB_URL = 'https://rkmprweazevohuvkikly.supabase.co';
+const SB_KEY = 'sb_publishable_Ubxz8lIpNTfHQXF7ZXq_Fw_sl2iRx6K';
+const SB_H = {apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json'};
+let lastTotal = START_CASH, lastSent = '', sending = false, pubTimer;
+let nick = ''; try { nick = localStorage.getItem('kleague-nick') || ''; } catch(e){}
+let pid = ''; try { pid = localStorage.getItem('kleague-pid') || ''; } catch(e){}
+if (!pid){ pid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('p' + Date.now() + Math.random().toString(36).slice(2)); try { localStorage.setItem('kleague-pid', pid); } catch(e){} }
+function winCount(){ return Object.values(state.paid).filter(v => v==='win').length; }
+function schedulePublish(){ if (!nick) return; clearTimeout(pubTimer); pubTimer = setTimeout(publishScore, 1500); }
+async function publishScore(){
+  if (sending){ pubTimer = setTimeout(publishScore, 1500); return false; }
+  const body = {id: pid, nick, total: Math.round(lastTotal), won: winCount(), hidden: false, updated_at: new Date().toISOString()};
+  const key = body.nick + '|' + body.total + '|' + body.won;
+  if (key === lastSent) return true;
+  sending = true;
+  try {
+    const r = await fetch(SB_URL + '/rest/v1/board?on_conflict=id', {method: 'POST', headers: Object.assign({Prefer: 'resolution=merge-duplicates,return=minimal'}, SB_H), body: JSON.stringify(body)});
+    if (r.ok){ lastSent = key; return true; }
+  } catch(e){} finally { sending = false; }
+  return false;
+}
+function drawRank(rows){
+  const ol = $('#rkList'); ol.textContent = '';
+  if (!rows.length){ $('#rkMsg').textContent = '아직 아무도 없어요. 닉네임을 정하고 첫 번째로 참가해 보세요.'; return; }
+  $('#rkMsg').textContent = `총 자산 기준 상위 ${rows.length}명`;
+  rows.forEach((x, i) => {
+    const li = document.createElement('li');
+    if (x.id === pid) li.className = 'me';
+    const a = document.createElement('span'); a.className = 'n'; a.textContent = i+1;
+    const b = document.createElement('span'); b.textContent = String(x.nick || '익명').slice(0,12) + (x.won ? ` · 적중 ${x.won}` : '');
+    const c = document.createElement('span'); c.className = 'v'; c.textContent = won(+x.total || 0);
+    li.append(a, b, c); ol.append(li);
+  });
+}
+async function loadRank(){
+  $('#rkMsg').textContent = '불러오는 중…';
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/board?select=id,nick,total,won&hidden=eq.false&order=total.desc&limit=20`, {headers: SB_H});
+    if (!r.ok) throw new Error(r.status);
+    drawRank(await r.json());
+  } catch(e){ $('#rkList').textContent = ''; $('#rkMsg').textContent = '랭킹 서버에 연결하지 못했어요. 잠시 뒤에 다시 열어 주세요.'; }
+}
+$('#openRank').addEventListener('click', () => {
+  $('#rkNick').value = nick; $('#rkLeave').hidden = !nick;
+  $('#rank').showModal(); loadRank();
+});
+$('#rankClose').addEventListener('click', () => $('#rank').close());
+$('#rank').addEventListener('click', e => { if (e.target.id==='rank') $('#rank').close(); });
+$('#rkSave').addEventListener('click', async () => {
+  const v = $('#rkNick').value.trim().slice(0,12); if (!v) return;
+  nick = v; try { localStorage.setItem('kleague-nick', nick); } catch(e){}
+  lastSent = ''; clearTimeout(pubTimer); $('#rkLeave').hidden = false;
+  $('#rkMsg').textContent = '참가하는 중…';
+  const ok = await publishScore();
+  if (ok) loadRank(); else $('#rkMsg').textContent = '참가 정보를 보내지 못했어요. 잠시 뒤에 다시 눌러 주세요.';
+});
+$('#rkLeave').addEventListener('click', async () => {
+  clearTimeout(pubTimer); nick = ''; lastSent = '';
+  try { localStorage.removeItem('kleague-nick'); } catch(e){}
+  $('#rkNick').value = ''; $('#rkLeave').hidden = true;
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/board?id=eq.${encodeURIComponent(pid)}`, {method: 'PATCH', headers: Object.assign({Prefer: 'return=minimal'}, SB_H), body: JSON.stringify({hidden: true})});
+    if (!r.ok) throw new Error(r.status);
+    loadRank();
+  } catch(e){ $('#rkMsg').textContent = '참가 취소가 안 됐어요. 잠시 뒤에 다시 해 주세요.'; }
+});
+
+/* ===== 내 성적 카드(이미지) ===== */
+let dl = null, shareBlob = null;
+(async () => { try { if (window.claude && window.claude.use) dl = await window.claude.use('downloads'); } catch(e){} })();
+async function makeCard(){
+  try { await document.fonts.load('900 40px "Noto Sans KR"'); await document.fonts.load('500 30px "Noto Sans KR"'); } catch(e){}
+  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'), F = '"Noto Sans KR",sans-serif';
+  const {p} = prices();
+  const total = Math.round(lastTotal), pl = total - START_CASH, pct = pl / START_CASH * 100;
+  const hold = TEAMS.filter(t => state.hold[t.id]).map(t => ({t, v: state.hold[t.id].qty * p[t.id], q: state.hold[t.id].qty})).sort((a,b) => b.v - a.v).slice(0,3);
+  const rr = (x,y,w,h,r) => { g.beginPath(); g.roundRect(x,y,w,h,r); g.fill(); };
+  g.fillStyle = '#0B0F0D'; g.fillRect(0,0,W,H);
+  g.fillStyle = '#121A16'; rr(60,60,W-120,H-120,8);
+  const L = 120; g.textBaseline = 'alphabetic';
+  g.fillStyle = '#3FB968'; g.font = `700 34px ${F}`; g.fillText(nick ? `${nick}님의 성적표` : '내 성적표', L, 170);
+  g.fillStyle = '#E8ECE8'; g.font = `700 72px ${F}`; g.fillText('K리그 주식시장', L, 255);
+  g.fillStyle = '#8A948C'; g.font = `500 32px ${F}`; g.fillText('내 총 자산', L, 380);
+  g.fillStyle = '#E8ECE8'; g.font = `700 124px ${F}`; g.fillText(won(total), L, 505);
+  const col = pl > 0 ? '#E5675F' : (pl < 0 ? '#5B8DEF' : '#8A948C');
+  g.fillStyle = col; g.font = `700 46px ${F}`; g.fillText(`${pl>0?'+':''}${won(pl)}  (${pl>0?'+':''}${pct.toFixed(2)}%)`, L, 580);
+  g.fillStyle = '#232C27'; g.fillRect(L, 640, W-2*L, 2);
+  g.fillStyle = '#8A948C'; g.font = `500 30px ${F}`; g.fillText('가장 많이 가진 팀', L, 705);
+  if (!hold.length){ g.fillStyle = '#8A948C'; g.font = `500 38px ${F}`; g.fillText('아직 없어요', L, 785); }
+  hold.forEach((x,i) => {
+    const y = 790 + i*86;
+    g.fillStyle = COLOR[x.t.id]; g.beginPath(); g.arc(L+28, y-14, 28, 0, Math.PI*2); g.fill();
+    g.fillStyle = '#FFFFFF'; g.font = `700 30px ${F}`; g.textAlign = 'center'; g.fillText(x.t.name.replace('FC ','')[0], L+28, y-3); g.textAlign = 'left';
+    g.fillStyle = '#E8ECE8'; g.font = `700 40px ${F}`; g.fillText(x.t.name, L+80, y);
+    g.fillStyle = '#8A948C'; g.font = `500 30px ${F}`; g.fillText(`${x.q}주`, L+300, y);
+    g.fillStyle = '#E8ECE8'; g.font = `700 38px ${F}`; g.textAlign = 'right'; g.fillText(won(x.v), W-L, y); g.textAlign = 'left';
+  });
+  g.fillStyle = '#1A2420'; rr(L, 1068, W-2*L, 110, 8);
+  g.fillStyle = '#E8ECE8'; g.font = `700 36px ${F}`; g.fillText('스코어 맞추기', L+36, 1135);
+  g.fillStyle = '#3FB968'; g.font = `700 44px ${F}`; g.textAlign = 'right'; g.fillText(`${winCount()}경기 적중`, W-L-36, 1137); g.textAlign = 'left';
+  g.fillStyle = '#8A948C'; g.font = `500 26px ${F}`; g.fillText('가상 머니 게임이에요. 실제 돈과는 상관없어요.', L, 1245);
+  g.fillStyle = '#E8ECE8'; g.font = `700 30px ${F}`; g.textAlign = 'right'; g.fillText('전모알', W-L, 1245); g.textAlign = 'left';
+  return new Promise(res => c.toBlob(b => res(b), 'image/png'));
+}
+$('#openShare').addEventListener('click', async () => {
+  $('#shareHint').textContent = '카드를 만드는 중…'; $('#shareSave').hidden = true; $('#shareImg').removeAttribute('src');
+  $('#share').showModal();
+  try {
+    shareBlob = await makeCard();
+    if (!shareBlob) throw new Error('empty');
+    const old = $('#shareImg').dataset.u; if (old) URL.revokeObjectURL(old);
+    const u = URL.createObjectURL(shareBlob); $('#shareImg').dataset.u = u; $('#shareImg').src = u;
+    $('#shareSave').hidden = !dl;
+    $('#shareHint').textContent = dl ? '저장해서 스토리에 올려 보세요.' : '이미지를 길게 눌러 저장한 뒤 스토리에 올려 보세요.';
+  } catch(e){ $('#shareHint').textContent = '카드를 못 만들었어요. 잠시 뒤에 다시 해 주세요.'; }
+});
+$('#shareSave').addEventListener('click', async () => {
+  if (!dl || !shareBlob) return;
+  try { await dl.save({filename: 'jeonmoal-stock-card.png', data: shareBlob}); $('#shareHint').textContent = '저장했어요.'; }
+  catch(e){ if (e && e.code !== 'declined') $('#shareHint').textContent = '여기서는 바로 저장이 안 돼요. 이미지를 길게 눌러 저장해 주세요.'; }
+});
+$('#shareClose').addEventListener('click', () => $('#share').close());
+$('#share').addEventListener('click', e => { if (e.target.id==='share') $('#share').close(); });
+
+let armed = false, timer;
+$('#resetBtn').addEventListener('click', e => {
+  if (!armed){ armed = true; e.target.textContent = '정말 처음부터 할까요? 한 번 더 눌러 주세요'; timer = setTimeout(()=>{armed=false; e.target.textContent='처음부터 다시 시작';}, 4000); return; }
+  clearTimeout(timer); armed = false; e.target.textContent = '처음부터 다시 시작';
+  state = {cash: START_CASH, hold:{}, demo:[], picks:{}, paid:{}}; save(); render(); say('처음부터 다시 시작했어요.');
+});
+
+render();
+</script>
+
+</body>
+</html>
