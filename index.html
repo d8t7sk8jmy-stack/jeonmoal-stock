@@ -1,8 +1,4 @@
-<!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>K리그 주식시장</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,6 +47,11 @@ h1{font-family:var(--serif);font-weight:700;font-size:var(--t5);line-height:1.25
 .evrow{display:flex;gap:8px 16px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px}
 .evnote{margin:0;font-size:var(--t2);color:var(--muted)}
 .evnote b{color:var(--text);font-weight:500}
+.movers{margin:8px 0 16px;font-size:var(--t2);color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px}
+.movers:empty{display:none}
+.movers b{font-weight:500;color:var(--text)}
+.movers .up{color:var(--up)}
+.movers .down{color:var(--down)}
 
 .pickbar{display:flex;gap:12px 16px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px}
 .pickbar b{font-size:var(--t3);font-weight:500;display:block}
@@ -166,6 +167,7 @@ footer{margin-top:32px;font-size:var(--t1);color:var(--muted)}
   <div class="panel me" id="me" aria-label="내 자산"></div>
   <p class="status" id="status" role="status" aria-live="polite"></p>
   <div class="evrow"><p class="evnote" id="evnote"></p><button class="ghost" id="openShare">내 성적 카드</button></div>
+  <p class="movers" id="movers"></p>
 
   <div class="panel pickbar">
     <div><b>스코어 맞추기</b><span>파이널 라운드 경기 결과를 맞히면 경기당 300,000 머니를 줘요.</span></div>
@@ -366,6 +368,10 @@ function render(){
   const total = state.cash + eq, pl = total - START_CASH, plPct = pl/START_CASH*100; lastTotal = total; schedulePublish();
   $('#evnote').innerHTML = EVENT_DAYS.includes(new Date(kstToday()+'T00:00:00Z').getUTCDay()) && kstToday() >= EVENT_START
     ? '<b>오늘은 이벤트 날이에요.</b> 가격이 무작위로 움직였어요.' : `다음 이벤트는 ${nextEvent()}`;
+  const mv = TEAMS.map(t => { const q = h[t.id]; return {t, d: q.length<2 ? 0 : (q[q.length-1]/q[q.length-2]-1)*100}; });
+  const top = mv.reduce((a,b) => b.d > a.d ? b : a), low = mv.reduce((a,b) => b.d < a.d ? b : a);
+  $('#movers').innerHTML = (top.d > 0.0001 ? `<span>가장 많이 오른 팀 <b>${top.t.name}</b> <span class="up">▲ ${top.d.toFixed(1)}%</span></span>` : '')
+    + (low.d < -0.0001 ? `<span>가장 많이 내린 팀 <b>${low.t.name}</b> <span class="down">▼ ${Math.abs(low.d).toFixed(1)}%</span></span>` : '');
   const plc = pl>0 ? 'pos' : pl<0 ? 'neg' : 'zero';
   $('#me').innerHTML =
     `<small>내 총 자산</small><div class="m-big">${won(total)}<span>머니</span></div>`+
@@ -657,5 +663,4 @@ $('#resetBtn').addEventListener('click', e => {
 render();
 </script>
 
-</body>
-</html>
+</body></html>
