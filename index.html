@@ -152,6 +152,9 @@ dialog h2{font-family:var(--serif);font-size:var(--t4);font-weight:700;margin:0 
 .rules li b{display:block;color:var(--text);font-weight:500}
 .reset{margin-top:24px}
 footer{margin-top:32px;font-size:var(--t1);color:var(--muted)}
+.visits{margin:8px 0 0}
+.visits:empty{display:none}
+.visits span+span::before{content:" · "}
 
 @media (max-width:480px){
   .panel{padding:16px}
@@ -195,7 +198,7 @@ footer{margin-top:32px;font-size:var(--t1);color:var(--muted)}
     </ul>
   </section>
   <div class="reset"><button class="ghost" id="resetBtn">처음부터 다시 시작</button></div>
-  <footer>전모알 · 전북현대의 모든 것을 알려준다</footer>
+  <footer>전모알 · 전북현대의 모든 것을 알려준다<p class="visits" id="visits"></p></footer>
 </div>
 
 <dialog id="order" aria-labelledby="oTitle">
@@ -660,7 +663,44 @@ $('#resetBtn').addEventListener('click', e => {
   state = {cash: START_CASH, hold:{}, demo:[], picks:{}, paid:{}}; save(); render(); say('처음부터 다시 시작했어요.');
 });
 
+/* ===== 경기 결과: Supabase results 표에서 읽어 옵니다 (운영자가 표에 한 줄 넣으면 바로 반영) ===== */
+const TEAM_IDS = TEAMS.map(t => t.id);
+async function loadResults(){
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/results?select=round,home,away,home_score,away_score&order=round.asc,id.asc`, {headers: SB_H});
+    if (!r.ok) return;
+    const rows = await r.json();
+    if (!Array.isArray(rows)) return;
+    const next = rows.filter(x => TEAM_IDS.includes(x.home) && TEAM_IDS.includes(x.away) && Number.isInteger(x.home_score) && Number.isInteger(x.away_score))
+      .map(x => ({round: +x.round, home: x.home, away: x.away, hs: x.home_score, as: x.away_score}));
+    const sig = JSON.stringify(next);
+    if (sig === JSON.stringify(RESULTS)) return;
+    RESULTS.length = 0; next.forEach(x => RESULTS.push(x));
+    render(); if ($('#pick').open) drawPicks();
+  } catch(e){}
+}
+
+/* ===== 방문 수: 브라우저를 열 때 한 번 기록하고(새로고침은 세지 않아요), 누적 숫자를 보여 줍니다 ===== */
+async function countVisit(){
+  let seen = false; try { seen = sessionStorage.getItem('kleague-visit') === '1'; } catch(e){}
+  if (!seen){
+    try {
+      const r = await fetch(`${SB_URL}/rest/v1/visits`, {method: 'POST', headers: Object.assign({Prefer: 'return=minimal'}, SB_H), body: JSON.stringify({pid})});
+      if (r.ok){ try { sessionStorage.setItem('kleague-visit', '1'); } catch(e){} }
+    } catch(e){}
+  }
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/visit_stats`, {method: 'POST', headers: SB_H, body: '{}'});
+    if (!r.ok) return;
+    const s = await r.json(), f = n => Number(n).toLocaleString('ko-KR');
+    if (s && Number.isFinite(+s.total)) $('#visits').innerHTML = `<span>누적 방문 ${f(s.total)}회</span><span>방문자 ${f(s.unique)}명</span><span>오늘 ${f(s.today)}회</span>`;
+  } catch(e){}
+}
+
 render();
+loadResults();
+countVisit();
+setInterval(loadResults, 60000);
 </script>
 
 </body></html>
