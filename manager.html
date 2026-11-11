@@ -120,10 +120,10 @@ label.l{display:block;margin:0 0 4px;font-size:var(--t1);color:var(--muted)}
 
 /* dialog */
 dialog{width:min(94vw,520px);max-height:88vh;max-height:calc(100dvh - 40px);padding:0;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:4px;overflow:hidden}
-dialog[open]{display:flex;flex-direction:column}
+dialog[open]{display:block}
 dialog::backdrop{background:rgba(0,0,0,.72)}
 .dh{padding:20px 20px 12px;flex:none}
-.db{padding:0 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1 1 auto;min-height:0}
+.db{padding:0 20px;overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:58vh;max-height:calc(100dvh - 260px)}
 .df{padding:16px 20px 20px;flex:none}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .chip{font-size:var(--t2);padding:4px 8px;border-radius:4px;background:var(--bg);border:1px solid var(--line)}
@@ -301,7 +301,7 @@ tr.me td{color:var(--accent)}
   <div class="links" id="hubLinks"><button type="button" class="ghost" data-hub="table">순위</button><button type="button" class="ghost" data-hub="scorers">득점</button><button type="button" class="ghost" data-hub="squad">선수단</button><button type="button" class="ghost" data-hub="hist">기록</button><button type="button" class="ghost" data-hub="rank">랭킹</button></div>
   <div class="foot"><button type="button" class="ghost" data-hub="card">커리어 카드</button><button type="button" class="ghost" id="btnReset">처음부터</button></div>
 </section>
-<p class="hint" style="margin-top:32px">전모알 · @jeon_moal · 팀과 선수 이름만 실제이고, 능력치와 모든 경기 결과는 팬이 임의로 정한 가상의 시뮬레이션입니다. 선수단은 2026년 3월 기준이라 이후 이적은 반영되지 않았어요. 진행 내용은 이 기기의 브라우저에만 저장돼요. 감독 이름과 전적은 랭킹에 공개됩니다.</p>
+<p class="hint" style="margin-top:32px">전모알 · @jeon_moal · v3 · 팀과 선수 이름만 실제이고, 능력치와 모든 경기 결과는 팬이 임의로 정한 가상의 시뮬레이션입니다. 선수단은 2026년 3월 기준이라 이후 이적은 반영되지 않았어요. 진행 내용은 이 기기의 브라우저에만 저장돼요. 감독 이름과 전적은 랭킹에 공개됩니다.</p>
 <p class="hint visits" id="visits"></p>
 </div>
 <dialog id="dlgV"><div class="dh" id="vHead"></div><div class="db" id="vBody"></div><div class="df" id="vFoot"></div></dialog>
